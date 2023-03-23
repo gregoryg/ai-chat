@@ -1,0 +1,134 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t broken-links:nil
+#+options: c:nil creator:nil d:(not "LOGBOOK") date:t e:t email:nil f:t inline:t num:t
+#+options: p:nil pri:nil prop:nil stat:t tags:t tasks:t tex:t timestamp:t title:t toc:t
+#+options: todo:t |:t
+#+title: Org mode for AI LLM chat
+#+date: <2023-03-23 jue>
+#+author: Gregory Grubbs
+#+email: gregory.grubbs@gmail.com
+#+language: en
+#+select_tags: export
+#+exclude_tags: noexport
+#+creator: Emacs 30.0.50 (Org mode 9.6)
+#+cite_export:
+
+
+* ChatGPT
+  :PROPERTIES:
+  :ID:       6f0c74ed-80e4-4034-87b8-b0aa0f40b6e5
+  :END:
+** Endpoint with conversational context
+   + Endpoint: https://api.openai.com/v1/chat/completions
+   + Doc: [[https://platform.openai.com/docs/guides/chat][Chat completion - OpenAI API ≫ platform.openai.com]]
+   This endpoints provides a =messages= parameter that provides context so that previous
+   answers are "remembered" and can be used as referents.
+
+   One idea I had is to tag sections of conversation so that only those tagged bits can
+   be used as context to further discussion on a particular topic.
+
+   Goals of this mode are
+   + maintain a conversation history
+   + capture in a way that dovetails with journaling, creating tasks and
+     Zettelkastenistisch methods
+   + Keep it in Emacs as a means of achieving the broader goals
+   + Help send relevant history only using tags from previous responses to excerpt
+     contextual info
+   + Use ChatGPT itself to provide the categorization
+   + Save multiple prompts - let them be additive to the categorization prompt
+   + Save categories - construct categorization prompt from those
+
+** Prompt to assist in categorization
+   #+begin_example
+     Please preface responses with a relevant category tag at the beginning
+     of each response. The categories are: coding for programming topics,
+     emacs even if it also involves programming, travel, food-drink,
+     fitness, ideas for research and learning topics, language for human
+     languages, music, and general.
+
+     Format the tag as in Org Mode, for example #+category: food-drink
+   #+end_example
+
+** Example API usage
+   #+begin_src http :pretty :wrap src json
+     GET https://jsonplaceholder.typicode.com/todos/1
+   #+end_src
+
+   #+name: payload
+   #+begin_src json
+     [
+         {"role": "system", "content": "You are a helpful assistant."},
+         {"role": "user", "content": "Who won the world series in 2020?"},
+         {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
+         {"role": "user", "content": "Where was it played?"}
+     ]
+   #+end_src
+
+   #+begin_src bash :wrap src json
+     curl -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${thepass}" \
+          -d '{
+         "model": "gpt-3.5-turbo",
+         "messages": [{"role": "user", "content": "What is a variation of that maintaining some of the flavor profile of the original?"}],
+         "max_tokens": 2000,
+         "temperature": 1.0,
+         "n": 1,
+         "stop": null
+       }' \
+          https://api.openai.com/v1/chat/completions
+   #+end_src
+
+   #+begin_src http :pretty :wrap src json
+     POST http://httpbin.org/post
+     Content-Type: application/json
+     {
+         "key": "value"
+     }
+   #+end_src
+
+   #+begin_src restclient :var url="https://httpbin.org" :jq .data :wrap src json
+     POST :url/post
+     Content-Type: application/json
+     { "key": "value" }
+   #+end_src
+
+   #+begin_src bash :var pass=(getenv "thepass")
+   #+end_src
+
+   #+begin_src http :var pass=(getenv "thepass")
+     POST http://api.openai.com/v1/chat/completions
+     Content-Type: application/json
+     Authorization: Bearer ${pass}
+     {
+              "model": "gpt-3.5-turbo",
+              "messages": [{"role": "user", "content": "What is a variation of that maintaining some of the flavor profile of the original?"}],
+              "max_tokens": 2000,
+              "temperature": 1.0,
+              "n": 1,
+              "stop": null
+     }
+   #+end_src
+
+   #+begin_src http :pretty :var pass=(getenv "thepass")
+     POST https://api.openai.com/v1/chat/completions
+     Content-Type: application/json
+     Authorization: Bearer $pass
+     {
+          "model": "gpt-3.5-turbo",
+          "messages": [{"role": "user", "content": "Say this is a test!"}],
+          "temperature": 0.7,
+          "max_tokens": 2000
+     }
+   #+end_src
+
+   #+begin_src restclient :var pass=(getenv "thepass")
+     POST https://api.openai.com/v1/chat/completions
+     Content-Type: application/json
+     Authorization: Bearer :pass
+     {
+          "model": "gpt-3.5-turbo",
+          "messages": [{"role": "user", "content": "Say this is a test!"}],
+          "temperature": 0.7,
+          "max_tokens": 2000
+     }
+   #+end_src
