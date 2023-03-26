@@ -10,8 +10,8 @@
 #+select_tags: export
 #+exclude_tags: noexport
 #+creator: Emacs 30.0.50 (Org mode 9.6)
-#+cite_export:
-
+#+property: header-args :comments org
+#+setupfile: ~/projects/emacs/org-html-themes/org/theme-readtheorg-local.setup
 
 * ChatGPT
   :PROPERTIES:
@@ -48,34 +48,26 @@
      Format the tag as in Org Mode, for example #+category: food-drink
    #+end_example
 
-** Example API usage
-   #+begin_src http :pretty :wrap src json
-     GET https://jsonplaceholder.typicode.com/todos/1
-   #+end_src
-
-   #+name: payload
-   #+begin_src json
-     [
-         {"role": "system", "content": "You are a helpful assistant."},
-         {"role": "user", "content": "Who won the world series in 2020?"},
-         {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
-         {"role": "user", "content": "Where was it played?"}
-     ]
-   #+end_src
-
-   #+begin_src bash :wrap src json
-     curl -X POST \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${thepass}" \
-          -d '{
-         "model": "gpt-3.5-turbo",
-         "messages": [{"role": "user", "content": "What is a variation of that maintaining some of the flavor profile of the original?"}],
-         "max_tokens": 2000,
-         "temperature": 1.0,
-         "n": 1,
-         "stop": null
+** Playing with API usage
+*** Shell
+   #+begin_src bash :wrap src json :results verbatim
+     curl -s -X POST \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${thepass}" \
+      -d '{
+     "model": "gpt-3.5-turbo",
+     "messages": [{"role": "user", "content": "What is a variation of that maintaining some of the flavor profile of the original?"}],
+     "max_tokens": 2000,
+     "temperature": 1.0,
+     "n": 1,
+     "stop": null
        }' \
-          https://api.openai.com/v1/chat/completions
+      https://api.openai.com/v1/chat/completions | jq -r '.'
+   #+end_src
+*** Org Babel - ob-http and ob-restclient
+   #+begin_src emacs-lisp
+     (require 'ob-restclient)
+     (require 'ob-http)
    #+end_src
 
    #+begin_src http :pretty :wrap src json
@@ -86,7 +78,7 @@
      }
    #+end_src
 
-   #+begin_src restclient :var url="https://httpbin.org" :jq .data :wrap src json
+   #+begin_src restclient :var url="https://httpbin.org" :wrap src json
      POST :url/post
      Content-Type: application/json
      { "key": "value" }
@@ -109,7 +101,14 @@
      }
    #+end_src
 
-   #+begin_src http :pretty :var pass=(getenv "thepass")
+   #+name: poodle
+   : [{"role": "user", "content": "Please give wildly incorrect and funny answers."},{"role": "user","content": "What is the capital of France?"}, {"role": "assistant", "content": "The capital of France is Pooper."},{"role": "user", "content": "What about Germany?"}]
+
+
+   # : [{"role": "user", "content": "Say a variaton of This is a test"}]
+
+
+   #+begin_src http :pretty :var pass=(getenv "thepass") :var payload=poodle
      POST https://api.openai.com/v1/chat/completions
      Content-Type: application/json
      Authorization: Bearer $pass
@@ -121,14 +120,110 @@
      }
    #+end_src
 
-   #+begin_src restclient :var pass=(getenv "thepass")
+   #+begin_src restclient :var pass=(getenv "thepass") :var payload=poodle
      POST https://api.openai.com/v1/chat/completions
      Content-Type: application/json
      Authorization: Bearer :pass
      {
           "model": "gpt-3.5-turbo",
-          "messages": [{"role": "user", "content": "Say this is a test!"}],
-          "temperature": 0.7,
+          "messages": :payload,
+          "temperature": 1.0,
           "max_tokens": 2000
      }
    #+end_src
+*** Emacs Lisp
+    + use the built-in =url= package
+
+    #+begin_src emacs-lisp
+
+    #+end_src
+** Playing with package code development
+*** Front matter
+    #+begin_src org
+      ,* License
+
+        Release under the [[file:LICENSE][MIT License]] unless otherwise specified by license files in subfolders.
+    #+end_src
+    #+begin_src emacs-lisp :tangle ai-chat.el
+      ;;; ai-chat.el --- Chat with ChatGPT and other AI Large Language Models -*- lexical-binding:t -*-
+      ;; Copyright (C)  ... [TODO]
+
+      ;; Author: Greg Grubbs <gregory.grubbs@gmail.com>
+      ;; Created: 2023-03-23
+      ;; Keywords: games
+
+      ;; This code is licensed under the MIT License (see LICENSE for details)
+
+      ;;; Commentary:
+
+      ;;; Code:
+
+      (require 'simple) ;; built-in package
+    #+end_src
+*** Define custom variables
+
+**** Categories
+     #+begin_src emacs-lisp :tangle ai-chat.el
+       (defcustom ai-chat-categories '((Food\ and\ Drink "food-drink" "")
+                                       (Coding "coding" "for programming topics")
+                                       (Emacs "emacs" "all things emacs - this should override coding when emacs is involved")
+                                       (Travel "travel" "")
+                                       (Fitness "fitness" "")
+                                       (Ideas "ideas" "for research and learning topics")
+                                       (General\ Catch-All "general" ""))
+         "List of categories to be used by AI chat."
+         :type
+         '(alist :key-type (symbol :tag "Category")
+                 :value-type (list (string :tag "kebab-case slug (e.g. food-drink)")
+                                   (string :tag "Optional additional description - no commas")))
+         :group 'ai-chat)
+     #+end_src
+**** Prompts
+     Goals
+     + Give a description that can show in marginalia etc
+     #+begin_src emacs-lisp :tangle ai-chat.el
+       (defcustom ai-chat-prompts nil
+         "List of GPT prompts that may be combined."
+         :type
+         '(alist :key-type (symbol :tag "Prompt name")
+                 :value-type (list (string :tag "Description")
+                                   (string :tag "Prompt text")))
+         :group 'ai-chat)
+     #+end_src
+*** Supporting functions
+**** Generate starting prompt
+     #+begin_src emacs-lisp :tangle ai-chat.el
+       (defun ai-chat-starting-prompt ()
+         "Return starting prompt for ai-chat package in order to provide categories.  Modify list and context for categories using ``ai-chat-categories''."
+         (concat "Please preface responses with a relevant category tag as the first line of each response.  The categories are: "
+                 (mapconcat
+                  (lambda (l)
+                    (let ((optional-desc (nth 2 l)))
+                      (concat (nth 1 l) " " (unless (string-empty-p optional-desc) (concat "for " optional-desc)) ",")))
+                  ai-chat-categories)
+                 "and general for everything else."))
+
+     #+end_src
+*** Main functions
+    #+begin_src emacs-lisp :tangle ai-chat.el
+      (defun ai-chat ()
+        "Chat with our AI thingie."
+        (interactive)
+        ;; let's start by cribbing from a simple interactive function: ielm
+        (let ((old-point)
+              (buf-name "*ai-chat*"))
+          (unless (comint-check-proc buf-name)
+            (with-current-buffer (get-buffer-create buf-name)
+              (unless (zerop (buffer-size))
+                (setq old-point (point)))
+              ;;inferior-ai-chat-mode
+              (shell-mode)
+              )
+            )
+          ))
+
+    #+end_src
+*** Provide package
+    #+begin_src emacs-lisp
+      (provide 'ai-chat)
+    #+end_src
