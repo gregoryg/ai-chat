@@ -1,3 +1,5 @@
+*.org.html
+src
 # Compiled
 *.elc
 
