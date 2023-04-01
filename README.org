@@ -19,8 +19,8 @@
   :END:
 ** Endpoint with conversational context
    + Endpoint: https://api.openai.com/v1/chat/completions
-   + Doc: [[https://platform.openai.com/docs/guides/chat][Chat completion - OpenAI API ≫ platform.openai.com]]
-   This endpoints provides a =messages= parameter that provides context so that previous
+   + Doc: [[https://platform.openai.com/docs/guides/chat][Chat completion - OpenAI API - platform.openai.com]]
+   This endpoint provides a =messages= parameter that provides context so that previous
    answers are "remembered" and can be used as referents.
 
    One idea I had is to tag sections of conversation so that only those tagged bits can
@@ -78,17 +78,18 @@
      }
    #+end_src
 
-   #+begin_src restclient :var url="https://httpbin.org" :wrap src json
+   #+begin_src restclient :var url="https://httpbin.org" :wrap src json :jq "."
      POST :url/post
      Content-Type: application/json
-     { "key": "value" }
+     { "key": "value", "greeting": "ohai" }
    #+end_src
 
    #+begin_src bash :var pass=(getenv "thepass")
    #+end_src
 
+   The following does not work with https
    #+begin_src http :var pass=(getenv "thepass")
-     POST http://api.openai.com/v1/chat/completions
+     POST https://api.openai.com/v1/chat/completions
      Content-Type: application/json
      Authorization: Bearer ${pass}
      {
@@ -102,25 +103,14 @@
    #+end_src
 
    #+name: poodle
-   : [{"role": "user", "content": "Please give wildly incorrect and funny answers."},{"role": "user","content": "What is the capital of France?"}, {"role": "assistant", "content": "The capital of France is Pooper."},{"role": "user", "content": "What about Germany?"}]
+   : [{"role": "user", "content": "What is a variation of that, maintaining the originalflavor profile? Just make up something ridiculous.  "}]
+   # : [{"role": "user", "content": "Please give wildly incorrect and funny answers."},{"role": "user","content": "What is the capital of France?"}, {"role": "assistant", "content": "The capital of France is Pooper."},{"role": "user", "content": "What about Germany?"}]
 
-
+   # : [{"role": "user", "content": "What is a variation of that, maintaining the originalflavor profile?   Just make something up."}]
    # : [{"role": "user", "content": "Say a variaton of This is a test"}]
 
 
-   #+begin_src http :pretty :var pass=(getenv "thepass") :var payload=poodle
-     POST https://api.openai.com/v1/chat/completions
-     Content-Type: application/json
-     Authorization: Bearer $pass
-     {
-          "model": "gpt-3.5-turbo",
-          "messages": [{"role": "user", "content": "Say this is a test!"}],
-          "temperature": 0.7,
-          "max_tokens": 2000
-     }
-   #+end_src
-
-   #+begin_src restclient :var pass=(getenv "thepass") :var payload=poodle
+   #+begin_src restclient :var pass=(getenv "thepass") :var payload=poodle :jq .choices[0].message.content
      POST https://api.openai.com/v1/chat/completions
      Content-Type: application/json
      Authorization: Bearer :pass
@@ -128,15 +118,49 @@
           "model": "gpt-3.5-turbo",
           "messages": :payload,
           "temperature": 1.0,
-          "max_tokens": 2000
+          "max_tokens": 4000
      }
    #+end_src
+
 *** Emacs Lisp
     + use the built-in =url= package
-
-    #+begin_src emacs-lisp
-
+    #+begin_src emacs-lisp :var pass=(getenv "thepass") :var payload=poodle
+      (let ((url-request-method "POST")
+            (url-request-extra-headers
+             `(("Content-Type" . "application/json")
+               ("Authorization" . ,(concat "Bearer " (getenv "thepass")))))
+            (url-request-data
+             `(
+               (messages . "What is up?")
+               (model . "gpt-3.5-turbo")
+               )))
+        (url-retrieve-synchronously "https://api.openai.com/v1/chat/completions"))
     #+end_src
+    + Screw =url=, use =request=
+      #+begin_src emacs-lisp :var payload=poodle
+        ;; (json-encode
+        ;;          `(("model"       . "gpt-3.5-turbo")
+        ;;            ("messages"    . ,payload)
+        ;;            ("temperature" . 1.0)
+        ;;            ("max_tokens"  . 4000)))
+
+        (use-package request :straight t)
+        (request "https://api.openai.com/v1/chat/completions"
+          :type "POST"
+          :headers `(("Content-Type" . "application/json")
+                     ("Authorization" . (concat "Bearer " ,payload)))
+          :data (json-encode
+                 `(("model"       . "gpt-3.5-turbo")
+                   ("messages"    . ,payload)
+                   ("temperature" . 1.0)
+                   ("max_tokens"  . 4000)))
+          :parser 'json-read
+          :success (cl-function
+                    (lambda (&key data &allow-other-keys)
+                      (message "I sent bullshit"))))
+      #+end_src
+
+
 ** Playing with package code development
 *** Front matter
     #+begin_src org
